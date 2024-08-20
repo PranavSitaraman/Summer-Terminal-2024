@@ -24,6 +24,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         SP = 0
         self.scored_on_locations = []
         self.damaged_locations = []
+        self.last_attack = 0
 
     def on_turn(self, turn_state):
         game_state = gamelib.GameState(self.config, turn_state)
@@ -58,8 +59,10 @@ class AlgoStrategy(gamelib.AlgoCore):
     def rebuild_defense(self, game_state):
         turret_locations = [[27, 13], [25, 13], [23, 13], [24, 12]]
         game_state.attempt_spawn(TURRET, turret_locations)
+        game_state.attempt_upgrade(turret_locations)
         turret_locations = [[0, 13], [1, 12], [2, 13], [4, 13]]
         game_state.attempt_spawn(TURRET, turret_locations)
+        game_state.attempt_upgrade(turret_locations)
         wall_locations = [[1, 13], [3, 13], [26, 13], [24, 13]]
         game_state.attempt_spawn(WALL, wall_locations)
         turret_locations = [[12, 4], [13, 4]]
@@ -110,16 +113,18 @@ class AlgoStrategy(gamelib.AlgoCore):
         return filtered
     
     def main_alg(self, game_state, best_location_attack, best_location_defense):
-        if game_state.turn_number > 5:
-            if game_state.enemy_health <= 10:
-                turret_locations = [[22, 11], [10, 4]]
+        if game_state.turn_number > 5 or game_state.my_health <= 25:
+            turret_locations = [[22, 11], [10, 4]]
+            game_state.attempt_spawn(TURRET, turret_locations)
+            if (self.last_attack == 1 or game_state.enemy_health <= 10) and game_state.get_resource(MP) > 8 * gamelib.GameUnit(SCOUT, game_state.config).cost[1]:
+                game_state.attempt_spawn(SCOUT, best_location_attack, 8)
+                self.last_attack = 0
+            if self.last_attack == 0 and game_state.get_resource(MP) > 5 * gamelib.GameUnit(DEMOLISHER, game_state.config).cost[1]:
                 game_state.attempt_spawn(TURRET, turret_locations)
-                game_state.attempt_spawn(SCOUT, best_location_attack, 10)
-
-            if game_state.enemy_health > 10 or game_state.turn_number % 2 == 0:
                 game_state.attempt_spawn(DEMOLISHER, best_location_attack, 5)
+                self.last_attack = 1
         
-        if game_state.turn_number <= 5 or (game_state.my_health < 10 and game_state.enemy_health > 20):
+        else:
             game_state.attempt_spawn(INTERCEPTOR, best_location_defense, 2)
         
         wall_locations = [[2,11], [3,10], [4,9], [5,8], [6,7], [7,6], [8,5], [9,4]]
