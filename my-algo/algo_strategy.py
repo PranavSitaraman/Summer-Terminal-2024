@@ -55,12 +55,26 @@ class AlgoStrategy(gamelib.AlgoCore):
                         game_state.attempt_spawn(TURRET, build_location)
                     else:
                         game_state.attempt_spawn(WALL, build_location)
+        
+        for location in self.damaged_locations:
+            surrounding = [0, -1, 1]
+            for i in surrounding:
+                for j in surrounding:
+                    build_location = [location[0] + i, location[1] + j]
+                    if game_state.attempt_spawn(TURRET, build_location) == 1:
+                        return
     
     def rebuild_defense(self, game_state):
-        turret_locations = [[27, 13], [25, 13], [23, 13], [24, 12]]
+        turret_locations = [[4, 13], [4, 12], [23, 13], [23, 12]]
         game_state.attempt_spawn(TURRET, turret_locations)
         game_state.attempt_upgrade(turret_locations)
-        turret_locations = [[0, 13], [1, 12], [2, 13], [4, 13]]
+        turret_locations = [[10, 13], [10, 12], [17, 13], [17, 12]]
+        game_state.attempt_spawn(TURRET, turret_locations)
+        game_state.attempt_upgrade(turret_locations)
+        turret_locations = [[27, 13], [25, 13], [24, 12]]
+        game_state.attempt_spawn(TURRET, turret_locations)
+        game_state.attempt_upgrade(turret_locations)
+        turret_locations = [[0, 13], [2, 13], [3, 13]]
         game_state.attempt_spawn(TURRET, turret_locations)
         game_state.attempt_upgrade(turret_locations)
         wall_locations = [[1, 13], [3, 13], [26, 13], [24, 13]]
@@ -75,7 +89,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         game_state.attempt_spawn(WALL, wall_locations)
         wall_locations = [[18, 6], [19, 7], [20, 8]]
         game_state.attempt_spawn(WALL, wall_locations)
-        turret_locations = [[20, 9], [20, 10], [21, 10], [23, 12]]
+        turret_locations = [[20, 9], [20, 10], [21, 10]]
         game_state.attempt_spawn(TURRET, turret_locations)
     
     def best_intercept_location(self, game_state, location_options):
@@ -105,7 +119,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         return location_options[damages.index(min(damages))]
     
     def filter_blocked_starting(self, game_state):
-        locations = [i for i in game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_LEFT) + game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_RIGHT) if i[1] < 6]
+        locations = [i for i in game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_LEFT) + game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_RIGHT) if i[1] < 9]
         filtered = []
         for location in locations:
             if not game_state.contains_stationary_unit(location):
@@ -113,20 +127,15 @@ class AlgoStrategy(gamelib.AlgoCore):
         return filtered
     
     def main_alg(self, game_state, best_location_attack, best_location_defense):
-        if game_state.turn_number > 5 or game_state.my_health <= 25:
-            turret_locations = [[22, 11], [10, 4]]
+        turret_locations = [[22, 11], [10, 4]]
+        game_state.attempt_spawn(TURRET, turret_locations)
+        if (self.last_attack == 1 or game_state.enemy_health <= 10) and game_state.get_resource(MP) > min(game_state.enemy_health, 8) * gamelib.GameUnit(SCOUT, game_state.config).cost[1]:
+            game_state.attempt_spawn(SCOUT, best_location_attack, 8)
+            self.last_attack = 0
+        if self.last_attack == 0 and game_state.get_resource(MP) > 5 * gamelib.GameUnit(DEMOLISHER, game_state.config).cost[1]:
             game_state.attempt_spawn(TURRET, turret_locations)
-            if (self.last_attack == 1 or game_state.enemy_health <= 10) and game_state.get_resource(MP) > 8 * gamelib.GameUnit(SCOUT, game_state.config).cost[1]:
-                game_state.attempt_spawn(SCOUT, best_location_attack, 8)
-                self.last_attack = 0
-            if self.last_attack == 0 and game_state.get_resource(MP) > 5 * gamelib.GameUnit(DEMOLISHER, game_state.config).cost[1]:
-                game_state.attempt_spawn(TURRET, turret_locations)
-                game_state.attempt_spawn(DEMOLISHER, best_location_attack, 5)
-                self.last_attack = 1
-        
-        else:
-            game_state.attempt_spawn(INTERCEPTOR, best_location_defense, 2)
-        
+            game_state.attempt_spawn(DEMOLISHER, best_location_attack, 5)
+            self.last_attack = 1
         wall_locations = [[2,11], [3,10], [4,9], [5,8], [6,7], [7,6], [8,5], [9,4]]
         game_state.attempt_spawn(WALL, wall_locations)
 
