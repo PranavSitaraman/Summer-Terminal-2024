@@ -35,10 +35,10 @@ class AlgoStrategy(gamelib.AlgoCore):
         game_state.submit_turn()
 
     def strategy(self, game_state):
-        self.build_reactive_defense(game_state)
-        self.rebuild_defense(game_state)
         deploy_locations = self.filter_blocked_starting(game_state)
         self.main_alg(game_state, deploy_locations)
+        self.build_reactive_defense(game_state)
+        self.rebuild_defense(game_state)
 
     def build_reactive_defense(self, game_state):
         setup = [[0, 13], [1, 12], [2,11], [3,10], [4,9], [5,8], [6,7], [7,6], [8,5], [9,4], [10, 3], [11, 3], [12, 3], [13, 3], [14, 3], [15, 3], [16, 4], [17, 5], [18, 6], [19, 7], [20, 8], [21, 9], [22, 10], [23, 11], [24, 12], [25, 13], [26, 13], [27, 13]]
@@ -52,6 +52,8 @@ class AlgoStrategy(gamelib.AlgoCore):
                     else:
                         game_state.attempt_spawn(WALL, build_location)
         for location in self.damaged_locations:
+            if location[1] > 13:
+                continue
             surrounding = [0, -1, 1]
             for i in surrounding:
                 for j in surrounding:
@@ -60,12 +62,12 @@ class AlgoStrategy(gamelib.AlgoCore):
                         return
     
     def rebuild_defense(self, game_state):
-        turret_locations1 = [[10, 13], [10, 12], [17, 13], [17, 12]]
-        game_state.attempt_upgrade(turret_locations1)
-        game_state.attempt_spawn(TURRET, turret_locations1)
-        turret_locations2 = [[4, 13], [4, 12], [23, 13], [23, 12]]
-        game_state.attempt_upgrade(turret_locations2)
-        game_state.attempt_spawn(TURRET, turret_locations2)
+        turret_locations = [[10, 13], [10, 12], [17, 13], [17, 12]]
+        game_state.attempt_upgrade(turret_locations)
+        game_state.attempt_spawn(TURRET, turret_locations)
+        turret_locations = [[4, 13], [4, 12], [23, 13], [23, 12]]
+        game_state.attempt_upgrade(turret_locations)
+        game_state.attempt_spawn(TURRET, turret_locations)
         turret_locations = [[27, 13], [25, 13], [24, 12]]
         game_state.attempt_spawn(TURRET, turret_locations)
         turret_locations = [[0, 13], [2, 13], [3, 13]]
@@ -84,6 +86,8 @@ class AlgoStrategy(gamelib.AlgoCore):
         game_state.attempt_spawn(WALL, wall_locations)
         turret_locations = [[20, 9], [20, 10], [21, 10]]
         game_state.attempt_spawn(TURRET, turret_locations)
+        wall_locations = [[2,11], [3,10], [4,9], [5,8], [6,7], [7,6], [8,5], [9,4]]
+        game_state.attempt_spawn(WALL, wall_locations)
     
     def best_intercept_location(self, game_state, location_options):
         damages = []
@@ -112,7 +116,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         return location_options[damages.index(min(damages))], min(damages)
     
     def filter_blocked_starting(self, game_state):
-        locations = [i for i in game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_LEFT) + game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_RIGHT) if i[1] < 10]
+        locations = [i for i in game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_LEFT) + game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_RIGHT) if i[1] < 6]
         filtered = []
         for location in locations:
             if not game_state.contains_stationary_unit(location):
@@ -122,14 +126,30 @@ class AlgoStrategy(gamelib.AlgoCore):
     def main_alg(self, game_state, deploy_locations):
         best_location_attack, damage = self.least_damage_spawn_location(game_state, deploy_locations)
         best_location_defense = self.best_intercept_location(game_state, deploy_locations)
-        turret_locations = [[22, 11], [10, 4]]
-        game_state.attempt_spawn(TURRET, turret_locations)
-        if game_state.enemy_health <= 8 or (damage < 0.6 * 8 * gamelib.GameUnit(SCOUT, game_state.config).max_health and game_state.get_resource(MP) > 8 * gamelib.GameUnit(SCOUT, game_state.config).cost[1]):
-            game_state.attempt_spawn(SCOUT, best_location_attack, 8)
-        elif game_state.get_resource(MP) > 4 * gamelib.GameUnit(DEMOLISHER, game_state.config).cost[1]:
+        if self.last_attack == 2 or game_state.enemy_health <= 9 or (damage < 0.5 * 9 * gamelib.GameUnit(SCOUT, game_state.config).max_health and game_state.get_resource(MP) >= 9 * gamelib.GameUnit(SCOUT, game_state.config).cost[1]):
+            game_state.attempt_spawn(SCOUT, best_location_attack, 9)
+            support_loc = []
+            if (best_location_attack[0] < 2):
+                support_loc = [best_location_attack[0] + 2, best_location_attack[1]]
+            elif (best_location_attack[0] > 25):
+                support_loc = [best_location_attack[0] - 2, best_location_attack[1]]
+            else:
+                support_loc = [best_location_attack[0], best_location_attack[1] + 2]
+            game_state.attempt_spawn(SUPPORT, support_loc)
+            game_state.attempt_remove(support_loc)
+            self.last_attack = 0
+        elif game_state.get_resource(MP) >= 4 * gamelib.GameUnit(DEMOLISHER, game_state.config).cost[1]:
             game_state.attempt_spawn(DEMOLISHER, best_location_defense, 4)
-        wall_locations = [[2,11], [3,10], [4,9], [5,8], [6,7], [7,6], [8,5], [9,4]]
-        game_state.attempt_spawn(WALL, wall_locations)
+            support_loc = []
+            if (best_location_defense[0] < 2):
+                support_loc = [best_location_defense[0] + 2, best_location_defense[1]]
+            elif (best_location_defense[0] > 25):
+                support_loc = [best_location_defense[0] - 2, best_location_defense[1]]
+            else:
+                support_loc = [best_location_defense[0], best_location_defense[1] + 2]
+            game_state.attempt_spawn(SUPPORT, support_loc)
+            game_state.attempt_remove(support_loc)
+            self.last_attack += 1
 
     def on_action_frame(self, turn_string):
         state = json.loads(turn_string)
@@ -148,5 +168,6 @@ class AlgoStrategy(gamelib.AlgoCore):
                 self.damaged_locations.append(location)
 
 if __name__ == "__main__":
+
     algo = AlgoStrategy()
     algo.start()
